@@ -1,0 +1,353 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>ピスト道場</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap">
+<style>
+/* 横から見た試合場(ピスト)を中央に置き、上に採点器、下に行動ボタンと審判の解説を積む1画面ゲーム */
+:root{
+  --bg:#eef1f4; --panel:#ffffff; --ink:#18212b; --muted:#5d6b78; --line:#c9d1d9;
+  --piste:#2b3a4a; --piste-end:#4a3a2e; --strip:#d9e1e8;
+  --me:#1f9d6b; --cpu:#d6453d; --lamp-off:#3a4552; --accent:#2f6fb5;
+  --display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic",sans-serif;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#11171d; --panel:#1a232c; --ink:#e7edf2; --muted:#93a2b0; --line:#2e3b47;
+  --piste:#22303d; --piste-end:#3f3127; --strip:#3d4e5e;
+  --me:#2fbf86; --cpu:#ee5a51; --lamp-off:#2a333c; --accent:#5b9be0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#11171d; --panel:#1a232c; --ink:#e7edf2; --muted:#93a2b0; --line:#2e3b47;
+  --piste:#22303d; --piste-end:#3f3127; --strip:#3d4e5e;
+  --me:#2fbf86; --cpu:#ee5a51; --lamp-off:#2a333c; --accent:#5b9be0; color-scheme:dark}
+
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.7;
+  line-break:strict;overflow-wrap:break-word;}
+.pb{word-break:keep-all}
+.wrap{max-width:760px;margin:0 auto;padding-block:16px 40px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:14px}
+header{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:10px}
+h1{font-family:var(--display);font-weight:400;font-size:28px;line-height:1.2;margin:0;letter-spacing:.02em}
+h1 small{display:block;font-family:var(--body);font-size:13px;color:var(--muted);letter-spacing:0}
+.tabs{display:flex;gap:6px}
+.tab{border:1px solid var(--line);background:var(--panel);color:var(--muted);border-radius:999px;
+  padding:4px 12px;font:inherit;font-size:13px;white-space:nowrap}
+.tab.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.tab[disabled]{opacity:.55}
+
+/* 採点器 */
+.board{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px;
+  background:#0d1318;color:#e7edf2;border-radius:10px;padding:12px 16px}
+.side{display:flex;align-items:center;gap:12px}
+.side.r{justify-content:flex-end}
+.lamp{width:38px;height:38px;border-radius:50%;background:var(--lamp-off);flex:none;transition:background .15s,box-shadow .15s}
+.lamp.me.lit{background:var(--me);box-shadow:0 0 24px var(--me)}
+.lamp.cpu.lit{background:var(--cpu);box-shadow:0 0 24px var(--cpu)}
+.who{font-size:12px;color:#93a2b0;line-height:1.3}
+.score{font-family:var(--display);font-size:40px;line-height:1;font-variant-numeric:tabular-nums}
+.mid{text-align:center;font-size:12px;color:#93a2b0;line-height:1.4}
+.mid b{display:block;font-family:var(--display);font-weight:400;font-size:15px;color:#e7edf2}
+
+/* ピスト */
+.pistebox{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:8px;overflow:hidden}
+svg{display:block;width:100%;height:auto}
+.fencer{transition:transform .35s ease}
+.blade{transition:transform .25s ease;transform-box:fill-box;transform-origin:0% 50%}
+.armg{transition:transform .25s ease}
+.call{font-family:var(--display);font-size:22px;fill:var(--ink)}
+.hint{display:flex;gap:10px;align-items:center;font-size:14px;background:var(--panel);
+  border:1px dashed var(--line);border-radius:10px;padding:8px 12px}
+.hint .eye{font-family:var(--display);font-size:13px;color:var(--cpu);white-space:nowrap}
+
+/* 行動 */
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.act{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--ink);border-radius:10px;
+  padding:10px 4px 8px;display:flex;flex-direction:column;align-items:center;gap:2px;cursor:pointer;min-width:0}
+.act b{font-size:16px;white-space:nowrap}
+.act span{font-size:11px;color:var(--muted);white-space:nowrap}
+.act:hover{border-color:var(--accent)}
+.act:focus-visible,.tab:focus-visible,.btn:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.act.atk b{color:var(--cpu)}
+.act:disabled{opacity:.45;cursor:default}
+@media (max-width:420px){.act b{font-size:15px}.score{font-size:32px}.lamp{width:30px;height:30px}h1{font-size:24px}}
+
+/* 審判 */
+.ref{background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--accent);border-radius:10px;padding:12px 16px}
+.ref .log{font-size:13px;color:var(--muted)}
+.ref h2{font-family:var(--display);font-weight:400;font-size:18px;margin:2px 0 4px;text-wrap:balance}
+.ref p{margin:0}
+.ref .rule{margin-top:8px;font-size:13px;background:var(--bg);border-radius:8px;padding:6px 10px}
+.btn{font:inherit;font-weight:700;border:0;border-radius:999px;background:var(--accent);color:#fff;padding:8px 18px;margin-top:10px;cursor:pointer}
+
+/* ルール帳 */
+.book h3{font-size:15px;margin:0 0 6px}
+.book ul{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px}
+.book li{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.55}
+.book li b{display:block;font-size:14px}
+.book li.locked{color:var(--muted);border-style:dashed}
+.note{font-size:12px;color:var(--muted)}
+@media (prefers-reduced-motion:reduce){.fencer,.blade,.armg,.lamp{transition:none}}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <h1>ピスト道場<small class="pb">遊びながら<wbr>フェンシングの<wbr>ルールを<wbr>覚える(モック)</small></h1>
+    <div class="tabs" role="tablist">
+      <button class="tab on" role="tab" aria-selected="true">エペ</button>
+      <button class="tab" disabled>フルーレ 🔒</button>
+      <button class="tab" disabled>サーブル 🔒</button>
+    </div>
+  </header>
+
+  <div class="board" aria-live="polite">
+    <div class="side"><div class="lamp me" id="lampMe"></div><div><div class="who">あなた</div><div class="score" id="sMe">0</div></div></div>
+    <div class="mid"><b id="turnNo">1手目</b>5本先取<br>(本番は15本)</div>
+    <div class="side r"><div style="text-align:right"><div class="who">相手</div><div class="score" id="sCpu">0</div></div><div class="lamp cpu" id="lampCpu"></div></div>
+  </div>
+
+  <div class="pistebox">
+    <svg viewBox="0 0 700 190" role="img" aria-label="ピストと2人の選手">
+      <!-- ピスト本体(14m)。両端の2mは警告区域として色を変える -->
+      <rect x="20" y="140" width="660" height="22" rx="3" fill="var(--piste)"/>
+      <rect x="20" y="140" width="94" height="22" fill="var(--piste-end)"/>
+      <rect x="586" y="140" width="94" height="22" fill="var(--piste-end)"/>
+      <g stroke="var(--strip)" stroke-width="2">
+        <line x1="350" y1="140" x2="350" y2="162"/>
+        <line x1="256" y1="140" x2="256" y2="162"/>
+        <line x1="444" y1="140" x2="444" y2="162"/>
+        <line x1="21" y1="136" x2="21" y2="166" stroke-width="3"/>
+        <line x1="679" y1="136" x2="679" y2="166" stroke-width="3"/>
+      </g>
+      <g font-size="11" fill="var(--muted)" text-anchor="middle" font-family="var(--body)">
+        <text x="350" y="180">中央線</text>
+        <text x="256" y="180">構えの線</text>
+        <text x="444" y="180">構えの線</text>
+        <text x="67" y="180">後方2m</text>
+        <text x="633" y="180">後方2m</text>
+      </g>
+      <text id="call" class="call" x="350" y="34" text-anchor="middle">アン・ガルド</text>
+      <g id="fMe" class="fencer"></g>
+      <g id="fCpu" class="fencer"></g>
+      <circle id="hitDot" r="7" fill="none" stroke-width="3" opacity="0"/>
+    </svg>
+  </div>
+
+  <div class="hint"><span class="eye">相手の気配</span><span id="hint" class="pb"></span></div>
+
+  <div class="acts">
+    <button class="act" data-a="adv"><b>前進</b><span>1m 詰める</span></button>
+    <button class="act" data-a="ret"><b>後退</b><span>1m 下がる</span></button>
+    <button class="act atk" data-a="atk"><b>突き</b><span>3m まで届く</span></button>
+    <button class="act" data-a="par"><b>パラード</b><span>受けて反撃</span></button>
+  </div>
+
+  <section class="ref" id="ref"></section>
+
+  <section class="book">
+    <h3>覚えたルール <span class="note" id="bookCount"></span></h3>
+    <ul id="book"></ul>
+  </section>
+  <p class="note pb">モック版です。<wbr>相手の気配は<wbr>7割の確率で<wbr>本当の動きを<wbr>示します。<wbr>間合いは<wbr>1m単位に<wbr>簡略化しています。</p>
+</div>
+
+<script>
+const t = s => `<span class="pb">${s.split('|').join('<wbr>')}</span>`;
+const X = m => 350 + m * 47;           // ピスト上の位置(m)→ 画面のx座標
+const START = 2, END = 7, REACH = 3;
+
+const RULES = {
+  maai:  ['間合い', 'エペの|突きは|およそ|3mまで。|遠い|ところから|突いても|届きません。'],
+  zen:   ['全身が有効面', 'エペは|頭から|足先まで|どこを|突いても|1本。|足や|手首も|狙えます。'],
+  doji:  ['同時突き', 'エペには|優先権が|ありません。|ほぼ同時に|突けば|両方に|1点ずつ|入ります。'],
+  parry: ['パラード・リポスト', '相手の|剣を|払って|(パラード)、|すぐ|突き返す|(リポスト)と|1本。'],
+  rear:  ['後方ライン', 'ピストの|後ろの|端を|両足で|越えると、|相手に|1点|入ります。'],
+  corps: ['体がぶつかったら', '体が|ぶつかると|審判が|「アルト」で|止め、|構えから|やり直します。'],
+};
+const ACT = {adv:'前進', ret:'後退', atk:'突き', par:'パラード'};
+const TELL = {adv:'足が|前に|出たがっている', ret:'重心が|後ろに|乗っている', atk:'剣を|持つ|腕に|力が|入っている', par:'剣先が|少し|上がっている'};
+const PARTS = [['足',150],['太もも',128],['胸',96],['腕',90],['マスク',62]];
+
+let st;
+function newGame(){
+  st = {me:-START, cpu:START, sMe:0, sCpu:0, turn:1, learned:new Set(), busy:false, over:false};
+  draw(); setHint(); renderBook(); lamps(false,false); setBusy(false); call('アン・ガルド');
+  document.getElementById('hitDot').setAttribute('opacity', 0);
+  ref('構えて、はじめ', 'アン・ガルド|(構え)、|プレ?|(用意は|いい?)、|アレ!|(はじめ)。|行動を|1つ|選んでください。|相手も|同時に|動きます。');
+}
+
+function fencerSVG(color, pose){
+  // 右向きの選手。pose: stand / lunge / parry
+  const lunge = pose === 'lunge', parry = pose === 'parry';
+  const fx = lunge ? 34 : 18;
+  const blade = parry ? 'rotate(-55deg)' : lunge ? 'rotate(0deg)' : 'rotate(-12deg)';
+  return `
+    <g stroke="${color}" stroke-width="7" stroke-linecap="round" fill="none">
+      <line x1="0" y1="96" x2="${lunge?-26:-16}" y2="138"/>
+      <line x1="0" y1="96" x2="${fx}" y2="138"/>
+      <line x1="0" y1="96" x2="2" y2="62"/>
+      <line x1="2" y1="66" x2="-18" y2="56"/>
+      <line x1="-18" y1="56" x2="-22" y2="40"/>
+    </g>
+    <g class="armg" stroke="${color}" stroke-width="7" stroke-linecap="round">
+      <line x1="2" y1="68" x2="${lunge?34:24}" y2="${lunge?68:80}"/>
+    </g>
+    <g transform="translate(${lunge?34:24},${lunge?68:80})">
+      <line class="blade" x1="0" y1="0" x2="62" y2="0" stroke="var(--ink)" stroke-width="3" style="transform:${blade}"/>
+    </g>
+    <circle cx="4" cy="50" r="12" fill="var(--panel)" stroke="${color}" stroke-width="5"/>
+    <line x1="9" y1="44" x2="9" y2="56" stroke="${color}" stroke-width="3"/>`;
+}
+
+function draw(poseMe='stand', poseCpu='stand'){
+  const fm = document.getElementById('fMe'), fc = document.getElementById('fCpu');
+  fm.innerHTML = fencerSVG('var(--me)', poseMe);
+  fc.innerHTML = fencerSVG('var(--cpu)', poseCpu);
+  fm.style.transform = `translate(${X(st.me)}px,0)`;
+  fc.style.transform = `translate(${X(st.cpu)}px,0) scale(-1,1)`;
+  document.getElementById('sMe').textContent = st.sMe;
+  document.getElementById('sCpu').textContent = st.sCpu;
+  document.getElementById('turnNo').textContent = st.turn + '手目';
+}
+
+function cpuChoose(){
+  const d = st.cpu - st.me;
+  let w = d >= 4 ? {adv:55, ret:10, atk:10, par:25} : d >= 2 ? {adv:15, ret:25, atk:35, par:25} : {adv:5, ret:35, atk:40, par:20};
+  if (st.cpu >= END - 1) { w.ret = 3; w.par += 10; }
+  let r = Math.random() * Object.values(w).reduce((a,b)=>a+b), k;
+  for (k in w) { r -= w[k]; if (r < 0) break; }
+  return k;
+}
+function setHint(){
+  st.next = cpuChoose();
+  const keys = Object.keys(ACT);
+  const shown = Math.random() < .7 ? st.next : keys.filter(k=>k!==st.next)[Math.floor(Math.random()*3)];
+  document.getElementById('hint').innerHTML = t(TELL[shown]);
+  const d = st.cpu - st.me;
+  document.getElementById('hint').innerHTML += ` <span class="note">(間合い ${d}m)</span>`;
+}
+
+function lamps(me, cpu){
+  document.getElementById('lampMe').classList.toggle('lit', me);
+  document.getElementById('lampCpu').classList.toggle('lit', cpu);
+}
+function ref(title, body, ruleKey, log, cont){
+  let h = '';
+  if (log) h += `<div class="log">${log}</div>`;
+  h += `<h2>${t(title)}</h2><p>${t(body)}</p>`;
+  if (ruleKey){
+    const isNew = !st.learned.has(ruleKey);
+    st.learned.add(ruleKey);
+    h += `<div class="rule">${isNew?'📘 新しいルール:':'📘 ルール:'}<b>${RULES[ruleKey][0]}</b> ${t(RULES[ruleKey][1])}</div>`;
+    renderBook();
+  }
+  if (cont) h += `<button class="btn" id="cont">${cont}</button>`;
+  document.getElementById('ref').innerHTML = h;
+  if (cont) document.getElementById('cont').onclick = cont === 'もう一度' ? newGame : resetGuard;
+}
+function renderBook(){
+  const ul = document.getElementById('book');
+  ul.innerHTML = Object.entries(RULES).map(([k,[n,d]]) =>
+    st.learned.has(k) ? `<li><b>${n}</b>${t(d)}</li>` : `<li class="locked"><b>???</b>試合の中で解放されます</li>`).join('');
+  document.getElementById('bookCount').textContent = `${st.learned.size} / ${Object.keys(RULES).length}`;
+}
+function setBusy(b){ st.busy = b; document.querySelectorAll('.act').forEach(e=>e.disabled=b); }
+function call(s){ document.getElementById('call').textContent = s; }
+
+function showHit(who){
+  const [part, y] = PARTS[Math.floor(Math.random()*PARTS.length)];
+  const dot = document.getElementById('hitDot');
+  const x = who === 'me' ? X(st.me) + 4 : X(st.cpu) - 4;
+  dot.setAttribute('cx', x); dot.setAttribute('cy', y);
+  dot.setAttribute('stroke', who === 'me' ? 'var(--me)' : 'var(--cpu)');
+  dot.setAttribute('opacity', 1);
+  return part;
+}
+
+function play(a){
+  if (st.busy || st.over) return;
+  const c = st.next, d = st.cpu - st.me;
+  const log = `あなた:${ACT[a]} / 相手:${ACT[c]}`;
+  setBusy(true);
+
+  // 移動を先に反映(突きとパラードはその場)
+  let me = st.me + (a==='adv'?1:a==='ret'?-1:0);
+  let cpu = st.cpu + (c==='adv'?-1:c==='ret'?1:0);
+  let nd = cpu - me;
+  const outMe = me < -END, outCpu = cpu > END;
+  const reachNd = nd;  // 突いた側はその場なので、防いだ側が動いた後の間合いで届くか決まる
+  const bump = nd < 1;
+  if (bump) { me = st.me; cpu = st.cpu; nd = d; }
+  st.me = Math.max(me, -END - 1); st.cpu = Math.min(cpu, END + 1);
+  draw(a==='atk'?'lunge':a==='par'?'parry':'stand', c==='atk'?'lunge':c==='par'?'parry':'stand');
+
+  setTimeout(() => {
+    let pMe = 0, pCpu = 0, title, body, rule;
+    const reachMe = reachNd <= REACH, reachCpu = reachNd <= REACH;
+    if (outMe || outCpu){
+      if (outMe) pCpu = 1; if (outCpu) pMe = 1;
+      title = outCpu ? '相手が|後ろの|端を|越えた' : 'あなたが|後ろの|端を|越えた';
+      body = outCpu ? '下がりすぎた|相手の|反則。|あなたに|1点。' : '下がりすぎて|ピストの|外へ。|相手に|1点。';
+      rule = 'rear';
+    } else if (a==='atk' && c==='atk'){
+      if (d <= REACH){ pMe = pCpu = 1; title = '同時突き!|両者に|1点'; body = '2つの|ランプが|同時に|点きました。'; rule = 'doji'; }
+      else { title = '両者とも|空振り'; body = `間合いが|${d}mあり、|どちらの|突きも|届きませんでした。`; rule = 'maai'; }
+    } else if (a==='atk' || c==='atk'){
+      const atkMe = a==='atk', def = atkMe ? c : a, reach = atkMe ? reachMe : reachCpu;
+      if (!reach){
+        title = atkMe ? 'あなたの|突きは|届かず' : '相手の|突きは|届かず';
+        body = `間合いが|${reachNd}mあり、|剣先が|届きませんでした。`; rule = 'maai';
+      } else if (def === 'par'){
+        if (atkMe){ pCpu = 1; title = 'パラードされた!|相手の|リポスト'; body = '突きを|払われ、|すぐに|突き返されました。'; }
+        else { pMe = 1; title = 'パラード成功!|あなたの|リポスト'; body = '相手の|突きを|払って、|すぐに|突き返しました。'; }
+        rule = 'parry';
+      } else {
+        if (atkMe) pMe = 1; else pCpu = 1;
+        const part = showHit(atkMe ? 'cpu' : 'me');
+        title = atkMe ? `${part}に|命中!|あなたに|1点` : `${part}を|突かれた。|相手に|1点`;
+        body = def==='adv' ? (atkMe ? '前に|出てきた|ところを|突きました。' : '前に|出た|ところを|狙われました。')
+                           : def==='ret' ? '下がっても|まだ|届く|間合いでした。' : '';
+        rule = st.learned.has('zen') ? null : 'zen';
+      }
+    } else if (bump){
+      title = 'アルト!|(止め)'; body = '体が|ぶつかりそうに|なったので|審判が|止めました。'; rule = 'corps';
+    } else {
+      st.turn++; draw(); setHint(); setBusy(false);
+      ref('探り合い', `間合いは|${st.cpu-st.me}mに|なりました。|相手の|気配を|見て|次の|手を|選びましょう。`, null, log);
+      return;
+    }
+
+    st.sMe += pMe; st.sCpu += pCpu;
+    lamps(pMe>0, pCpu>0);
+    call(pMe||pCpu ? 'アルト!' : 'アルト');
+    draw(a==='atk'?'lunge':a==='par'?'parry':'stand', c==='atk'?'lunge':c==='par'?'parry':'stand');
+    if (st.sMe >= 5 || st.sCpu >= 5){
+      st.over = true;
+      const win = st.sMe > st.sCpu ? 'あなたの|勝ち!' : st.sMe < st.sCpu ? '相手の|勝ち' : '引き分け';
+      ref(`${win} ${st.sMe}-${st.sCpu}`, `${title.replace(/\|/g,'')}。|本番は|15本先取、|3分×3ピリオドで|行います。`, rule, log, 'もう一度');
+    } else {
+      ref(title, body || ' ', rule, log, '構えに戻る');
+    }
+  }, 380);
+}
+
+function resetGuard(){
+  st.me = -START; st.cpu = START; st.turn++;
+  lamps(false,false); call('アン・ガルド');
+  document.getElementById('hitDot').setAttribute('opacity', 0);
+  draw(); setHint(); setBusy(false);
+  ref('構えから|再開', '1本|入るたびに|両者は|構えの線に|戻ります。|プレ?|アレ!');
+}
+
+document.querySelectorAll('.act').forEach(b => b.onclick = () => play(b.dataset.a));
+newGame();
+</script>
+</body>
+</html>
