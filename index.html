@@ -261,13 +261,13 @@ const RULES = {
 };
 const WEAPON = {
   epee:  {name:'エペ', prio:false, atk:'突き', tech:'ファント', book:['maai','zen','doji','parry','rear','corps'],
-          desc:'<b>エペ</b>|全身が|有効面。|優先権は|なく、|同時に|突けば|両方に|1点。',
+          desc:'<b>エペ</b>:|全身が|有効面。|優先権は|なく、|同時に|突けば|両方に|1点。',
           intro:'エペは|頭から|足先まで|どこを|突いても|1本です。|{アン・ガルド(構え)}、|{プレ?(用意はいい?)}、|{アレ!(はじめ)}。'},
   foil:  {name:'フルーレ', prio:true, atk:'突き', tech:'ファント', book:['maai','dotai','white','prio','simul','pass','parry','rear'],
-          desc:'<b>フルーレ</b>|有効面は|胴体だけ。|優先権の|ある側だけに|点が|入る。',
+          desc:'<b>フルーレ</b>:|有効面は|胴体だけ。|優先権の|ある側だけに|点が|入る。',
           intro:'フルーレは|胴体だけが|有効面。|そして|「優先権」|という|ルールが|あります。|まずは|構えて、|{アレ!(はじめ)}。'},
   sabre: {name:'サーブル', prio:true, atk:'斬り', tech:'アタック', book:['maai','jouhan','kiri','prio','simul','pass','noreg','parry','rear'],
-          desc:'<b>サーブル</b>|有効面は|上半身。|斬っても|1本。|優先権も|ある。',
+          desc:'<b>サーブル</b>:|有効面は|上半身。|斬っても|1本。|優先権も|ある。',
           intro:'サーブルは|腕と|頭を|含む|上半身が|有効面で、|斬っても|1本。|フルーレと|同じく|優先権が|あります。'},
 };
 const ACT = {adv:'前進', ret:'後退', atk:'突き', par:'パラード'};
@@ -600,9 +600,10 @@ function play(a){
     if (pts.me || pts.cpu) lamps(pts.me>0 || document.getElementById('lampMe').classList.contains('lit'), pts.cpu>0 || document.getElementById('lampCpu').classList.contains('lit'));
     call('アルト');
     draw(pose(a), pose(c));
-    if (st.sMe >= 5 || st.sCpu >= 5){
+    if (st.sMe >= 5 && st.sMe === st.sCpu) body = (body ? body + '|' : '') + '同点なので、|このゲームでは|どちらかが|リードするまで|続けます。';
+    if ((st.sMe >= 5 || st.sCpu >= 5) && st.sMe !== st.sCpu){
       st.over = true;
-      const win = st.sMe > st.sCpu ? 'あなたの|勝ち' : st.sMe < st.sCpu ? '相手の|勝ち' : '引き分け';
+      const win = st.sMe > st.sCpu ? 'あなたの|勝ち' : '相手の|勝ち';
       ref(`${win} ${st.sMe}-${st.sCpu}`, `${title.replace(/\|/g,'')}。|本番は|15本先取で|行います。`, rule, log, 'もう一度', who);
     } else {
       ref(title, body || ' ', rule, log, '構えに戻る', who);
