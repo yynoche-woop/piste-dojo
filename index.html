@@ -44,6 +44,8 @@ h1{font-weight:700;font-size:24px;margin:0;line-height:1.3;color:var(--white)}
 .stage svg{display:block;width:100%;height:auto}
 .layer{transition:transform .6s cubic-bezier(.2,.7,.2,1)}
 .fencer{transition:transform .35s ease}
+.bob{animation:bob 1.4s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(1.6px)}}
 .drift{animation:drift 9s ease-in-out infinite alternate}
 @keyframes drift{to{transform:translateX(-18px)}}
 .trail{fill:none;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:1;stroke-dashoffset:1;
@@ -144,7 +146,7 @@ h1{font-weight:700;font-size:24px;margin:0;line-height:1.3;color:var(--white)}
 .next b{font-size:22px;font-weight:700}
 .next span{font-size:14px;color:#1c4a57}
 .next:active{transform:translateY(4px);box-shadow:0 1px 0 #2a6b7d}
-@media (prefers-reduced-motion:reduce){.layer,.fencer,.lamp,.act,.next{transition:none}.drift{animation:none}.trail{animation:none;stroke-dashoffset:0}}
+@media (prefers-reduced-motion:reduce){.layer,.fencer,.lamp,.act,.next{transition:none}.drift,.bob{animation:none}.trail{animation:none;stroke-dashoffset:0}}
 </style>
 </head>
 <body>
@@ -171,6 +173,7 @@ h1{font-weight:700;font-size:24px;margin:0;line-height:1.3;color:var(--white)}
           <feMerge><feMergeNode in="b"/><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
         </filter>
         <filter id="soft"><feGaussianBlur stdDeviation="7"/></filter>
+        <pattern id="mesh" width="3" height="3" patternUnits="userSpaceOnUse"><path d="M0 0L3 3M3 0L0 3" stroke="#7a828b" stroke-width=".55"/></pattern>
         <filter id="near"><feGaussianBlur stdDeviation="3"/></filter>
         <linearGradient id="deck" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#d4d8dc"/><stop offset="1" stop-color="#8d939a"/></linearGradient>
         <linearGradient id="wall" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1220"/><stop offset="1" stop-color="#05070a"/></linearGradient>
@@ -209,9 +212,9 @@ h1{font-weight:700;font-size:24px;margin:0;line-height:1.3;color:var(--white)}
           <text x="60" y="234">後方2m</text><text x="640" y="234">後方2m</text>
         </g>
         <g id="fMe" class="fencer"></g><g id="fCpu" class="fencer"></g>
-        <text id="tagMe" class="tag me" y="66" text-anchor="middle">あなた</text>
-        <text id="tagCpu" class="tag cpu" y="66" text-anchor="middle">相手</text>
-        <text id="prioMark" y="48" text-anchor="middle" opacity="0">▼ 優先権</text>
+        <text id="tagMe" class="tag me" y="56" text-anchor="middle">あなた</text>
+        <text id="tagCpu" class="tag cpu" y="56" text-anchor="middle">相手</text>
+        <text id="prioMark" y="40" text-anchor="middle" opacity="0">▼ 優先権</text>
         <g id="fx"></g>
       </g></g>
       <!-- 層4:手前のぼけたケーブル(いちばん近い) -->
@@ -376,34 +379,59 @@ function newGame(){
   ref(`${W().name}|はじめ`, W().intro + '|行動を|1つ|選んでください。|相手も|同時に|動きます。');
 }
 
-// 白い競技着の選手(右向き)。pose: stand / lunge / parry / slash / extend / fleche
-function fencerSVG(pose){
-  const L = pose === 'lunge' || pose === 'slash', P = pose === 'parry', S = pose === 'slash', E = pose === 'extend', F = pose === 'fleche';
-  const front = F ? [30,FLOOR-2] : L ? [44,FLOOR-2] : [20,FLOOR-2], back = F ? [56,FLOOR-24] : L ? [-34,FLOOR-2] : [-20,FLOOR-2];
-  const hip = L ? [0,152] : F ? [10,146] : [0,148], sh = F ? [24,108] : [4,108];
-  const hand = S ? [40,92] : (L || F) ? [50,112] : E ? [44,116] : P ? [30,104] : [30,124];
-  const tip = S ? [98,128] : (L || F) ? [116,112] : E ? [104,108] : P ? [58,62] : [92,112];
-  const knee = L ? [30,170] : F ? [20,172] : [14,172];
-  const head = F ? 28 : 8;
+// 選手の関節の位置(右向き)。腰・膝・足、肩・肘・手、頭、剣先
+const POSES = {
+  stand:  {hip:[0,145], kF:[22,166], fF:[30,194], kB:[-22,168], fB:[-36,194], sh:[6,105], eF:[25,120], hF:[43,116], eB:[-22,98], hB:[-28,78], head:[10,84], tip:[106,104]},
+  lunge:  {hip:[-6,152], kF:[34,162], fF:[56,194], kB:[-32,174], fB:[-70,194], sh:[10,110], eF:[38,110], hF:[62,108], eB:[-20,116], hB:[-42,128], head:[16,90], tip:[128,106]},
+  slash:  {hip:[-6,152], kF:[34,162], fF:[56,194], kB:[-32,174], fB:[-70,194], sh:[10,110], eF:[32,98], hF:[50,90], eB:[-20,116], hB:[-42,128], head:[16,90], tip:[108,128]},
+  parry:  {hip:[0,145], kF:[22,166], fF:[30,194], kB:[-22,168], fB:[-36,194], sh:[6,105], eF:[25,116], hF:[37,104], eB:[-22,98], hB:[-28,78], head:[9,84], tip:[68,58]},
+  extend: {hip:[2,146], kF:[24,167], fF:[32,194], kB:[-21,169], fB:[-36,194], sh:[9,106], eF:[33,112], hF:[55,110], eB:[-20,100], hB:[-26,80], head:[13,85], tip:[120,104]},
+  fleche: {hip:[8,144], kF:[28,168], fF:[30,194], kB:[34,172], fB:[58,184], sh:[28,104], eF:[50,104], hF:[70,103], eB:[8,112], hB:[-12,120], head:[34,84], tip:[136,102]},
+};
+// 白い競技着の選手(右向き)。輪郭線を引いた手足・ジャケット・メッシュのマスク・剣を重ねて描く
+function fencerSVG(pose, side){
+  const p = POSES[pose], O = '#141920', acc = COL[side];
+  const seg = (pts, w, col) => { const d = 'M' + pts.map(q => q.join(',')).join(' L');
+    return `<path d="${d}" stroke="${O}" stroke-width="${w + 3}"/><path d="${d}" stroke="${col}" stroke-width="${w}"/>`; };
+  const shoe = (f, col) => `<path d="M${f[0]-7},${f[1]} q1,-6 9,-6 l7,3 q2,3 -1,3 z" fill="${col}" stroke="${O}" stroke-width="1.5"/>`;
+  const [s0, s1] = p.sh, [h0, h1] = p.hip, [x, y] = p.head;
+  const torso = `M${s0+10},${s1-3} Q${s0+19},${s1+11} ${h0+13},${h1-2} L${h0+13},${h1+6} L${h0-13},${h1+6} L${h0-12},${h1-6} Q${s0-17},${s1+10} ${s0-9},${s1-4} Z`;
+  const tail = side === 'cpu' ? `<path d="M${x-11},${y-5} q-15,3 -13,24" stroke="${O}" stroke-width="7.5"/><path d="M${x-11},${y-5} q-15,3 -13,24" stroke="#6b4a33" stroke-width="5"/>` : '';
   return `
-    <ellipse cx="0" cy="${FLOOR}" rx="46" ry="5" fill="#000" opacity=".35"/>
-    <g stroke-linecap="round" stroke-linejoin="round" fill="none">
-      <path d="M${hip} L${back[0]+6},172 L${back}" stroke="#8e959c" stroke-width="11"/>
-      <path d="M${sh} L${sh[0]-20},104 L${sh[0]-28},${L?96:84}" stroke="#8e959c" stroke-width="8"/>
-      <path d="M${hip} L${sh}" stroke="#d7dbdf" stroke-width="20"/>
-      <path d="M${hip} L${knee} L${front}" stroke="#e4e7ea" stroke-width="12"/>
-      <path d="M${front[0]-2},${FLOOR-1} h12" stroke="#f4f5f6" stroke-width="6"/>
-      <path d="M${sh} L${hand}" stroke="#eceef0" stroke-width="9"/>
-      <path d="M${hand} L${tip}" stroke="#c9ced3" stroke-width="${weapon==='sabre'?3:2}"/>
+    <ellipse cx="${(p.fF[0]+p.fB[0])/2}" cy="${FLOOR}" rx="${Math.abs(p.fF[0]-p.fB[0])/2 + 16}" ry="5" fill="#000" opacity=".4"/>
+    <g class="bob"><g stroke-linecap="round" stroke-linejoin="round" fill="none">
+      ${seg([p.sh, p.eB, p.hB], 10, '#cfd4d9')}
+      ${seg([p.hip, p.kB], 17, '#cdd2d7')}${seg([p.kB, p.fB], 12, '#dde1e5')}
     </g>
-    <circle cx="${hand[0]}" cy="${hand[1]}" r="5" fill="#9aa1a8"/>
-    <ellipse cx="${head}" cy="88" rx="12" ry="14" fill="#2a2e33" stroke="#e6e9ec" stroke-width="2"/>
-    <path d="M${head-6} 82h12M${head-6} 88h13M${head-6} 94h12" stroke="#5a6067" stroke-width="1"/>`;
+    ${shoe(p.fB, '#7a828c')}
+    <circle cx="${p.hB[0]}" cy="${p.hB[1]}" r="4.5" fill="#d8d0c2" stroke="${O}" stroke-width="1.5"/>
+    <path d="${torso}" fill="#f2f4f6" stroke="${O}" stroke-width="1.8" stroke-linejoin="round"/>
+    <path d="M${s0-5},${s1+5} L${h0-7},${h1}" stroke="${acc}" stroke-width="2.5" opacity=".9"/>
+    <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+      ${seg([p.hip, p.kF], 17, '#eceff2')}${seg([p.kF, p.fF], 12, '#fbfcfd')}
+      ${tail}
+      ${seg([[s0+2, s1-2], [x, y+10]], 7, '#f2f4f6')}
+    </g>
+    ${shoe(p.fF, '#5d646d')}
+    <ellipse cx="${x-1}" cy="${y+13}" rx="9" ry="5" fill="#f5f6f7" stroke="${O}" stroke-width="1.4"/>
+    <ellipse cx="${x}" cy="${y}" rx="14" ry="15.5" fill="#2c3137" stroke="${O}" stroke-width="1.6"/>
+    <ellipse cx="${x+3}" cy="${y+1}" rx="8.5" ry="10.5" fill="#d4a98c" opacity=".3"/>
+    <ellipse cx="${x}" cy="${y}" rx="14" ry="15.5" fill="url(#mesh)"/>
+    <path d="M${x-8},${y-11} Q${x-17},${y} ${x-8},${y+12}" stroke="#f5f6f7" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <path d="M${x-11},${y-4} L${x-12},${y+4}" stroke="${acc}" stroke-width="2.5" stroke-linecap="round"/>
+    <g stroke-linecap="round" stroke-linejoin="round" fill="none">
+      ${seg([p.sh, p.eF, p.hF], 10.5, '#f4f5f7')}
+      <path d="M${p.hF[0]+5},${p.hF[1]} L${p.tip}" stroke="${O}" stroke-width="${weapon==='sabre'?4.2:3.6}"/>
+      <path d="M${p.hF[0]+5},${p.hF[1]} L${p.tip}" stroke="#e8edf1" stroke-width="${weapon==='sabre'?2.4:1.8}"/>
+    </g>
+    <circle cx="${p.hF[0]}" cy="${p.hF[1]}" r="5.5" fill="#e3dccf" stroke="${O}" stroke-width="1.5"/>
+    <ellipse cx="${p.hF[0]+6}" cy="${p.hF[1]}" rx="3" ry="8" fill="#c7ced5" stroke="${O}" stroke-width="1.3"/>
+    <circle cx="${p.tip[0]}" cy="${p.tip[1]}" r="1.8" fill="#e8edf1"/></g>`;
 }
 
 function draw(poseMe='stand', poseCpu='stand'){
   const fm = document.getElementById('fMe'), fc = document.getElementById('fCpu');
-  fm.innerHTML = fencerSVG(poseMe); fc.innerHTML = fencerSVG(poseCpu);
+  fm.innerHTML = fencerSVG(poseMe, 'me'); fc.innerHTML = fencerSVG(poseCpu, 'cpu');
   fm.style.transform = `translate(${X(st.me)}px,0)`;
   fc.style.transform = `translate(${X(st.cpu)}px,0) scale(-1,1)`;
   document.getElementById('tagMe').setAttribute('x', X(st.me));
