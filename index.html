@@ -39,6 +39,18 @@ h1{font-weight:700;font-size:24px;margin:0;line-height:1.3;color:var(--white)}
 .wdesc{font-size:14px;color:var(--muted)}
 .wdesc b{color:var(--ink)}
 
+/* レベル(級・段) */
+.lvl{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--hair);border-radius:12px;padding:8px 12px}
+.lvl .lab{font-size:12px;color:var(--muted);white-space:nowrap}
+.lvl .rank{font-weight:700;font-size:20px;color:var(--gold);white-space:nowrap;font-variant-numeric:tabular-nums}
+.lvl .bar{flex:1;height:8px;background:var(--panel2);border-radius:99px;overflow:hidden;min-width:50px}
+.lvl .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#ffd25a,#ff9f43);transition:width .6s}
+.lvl .info{font-size:12px;color:var(--muted);white-space:nowrap;text-align:right;line-height:1.4}
+.lvl .plus{font-weight:700;font-size:14px;color:var(--gold);white-space:nowrap;animation:fade 1.4s .8s forwards}
+.lvl.up{animation:lvup 1s 3}
+@keyframes lvup{50%{box-shadow:0 0 0 2px var(--gold),0 0 26px rgba(255,210,90,.55)}}
+@media (max-width:420px){.lvl .lab{display:none}}
+
 /* 競技場 */
 .stage{position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--hair);background:#05070a}
 .stage svg{display:block;width:100%;height:auto}
@@ -161,6 +173,11 @@ h1{font-weight:700;font-size:24px;margin:0;line-height:1.3;color:var(--white)}
       <button class="tab" role="tab" data-w="sabre" aria-selected="false">サーブル</button>
     </div>
   </header>
+  <div class="lvl" id="lvl" aria-live="polite">
+    <span class="lab">あなたのレベル</span><b class="rank" id="rank">10級</b>
+    <span class="bar"><i id="lvbar"></i></span><span class="plus" id="lvplus"></span>
+    <span class="info" id="lvinfo"></span>
+  </div>
   <div class="wdesc pb" id="wdesc"></div>
 
   <div class="stage">
@@ -321,6 +338,58 @@ const PART_W = {epee:[1,1,1,1,1,1], foil:[1,1,3,3,1,1], sabre:[.7,.7,2,2,2.2,2.2
 const VALID = {epee:()=>true, foil:p=>p==='torso', sabre:p=>p!=='leg'};
 const LEARNED = {epee:new Set(), foil:new Set(), sabre:new Set()};
 
+// レベル(将棋のような級・段)。経験値は 1本取る+10、新しいルール+20、勝ち+50、負けても+10
+const LEVELS = [[0,'10級'],[50,'9級'],[120,'8級'],[210,'7級'],[320,'6級'],[450,'5級'],[600,'4級'],[780,'3級'],
+  [980,'2級'],[1200,'1級'],[1450,'初段'],[1750,'二段'],[2100,'三段'],[2500,'四段'],[3000,'五段']];
+const SAVE_KEY = 'fencing-biyori';
+// 成績はこのブラウザにだけ保存する(読めない環境では保存なしで動く)
+const prog = (() => {
+  try {
+    const s = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
+    if (s){ for (const w in s.learned || {}) (s.learned[w] || []).forEach(k => LEARNED[w] && LEARNED[w].add(k));
+      return {xp: s.xp || 0, wins: s.wins || 0, losses: s.losses || 0}; }
+  } catch (e) {}
+  return {xp:0, wins:0, losses:0};
+})();
+function saveProg(){
+  try { localStorage.setItem(SAVE_KEY, JSON.stringify({...prog, learned: Object.fromEntries(Object.entries(LEARNED).map(([w, s]) => [w, [...s]]))})); } catch (e) {}
+}
+const levelOf = xp => { let i = 0; while (i + 1 < LEVELS.length && xp >= LEVELS[i + 1][0]) i++; return i; };
+function renderLevel(plus){
+  const i = levelOf(prog.xp), [base, name] = LEVELS[i], next = LEVELS[i + 1];
+  document.getElementById('rank').textContent = name;
+  document.getElementById('lvbar').style.width = next ? `${(prog.xp - base) / (next[0] - base) * 100}%` : '100%';
+  document.getElementById('lvinfo').innerHTML = `${next ? `${next[1]}まで あと${next[0] - prog.xp}` : '最高段位'}<br>通算 ${prog.wins}勝${prog.losses}敗`;
+  const pl = document.getElementById('lvplus');
+  pl.textContent = ''; if (plus){ void pl.offsetWidth; pl.textContent = `+${plus}`; }
+}
+// 応用の技はレベルが上がると覚える(相手もまだ使ってこない)。数字は LEVELS の番号(1=9級)
+const UNLOCK = {fei:1, cnt:2, fle:3};
+const unlocked = k => !(k in UNLOCK) || levelOf(prog.xp) >= UNLOCK[k];
+const SUB = {fei:'パラードを誘う', cnt:'攻撃に合わせる'};
+function updateLocks(){
+  for (const k in UNLOCK){
+    const btn = document.querySelector(`.act[data-a="${k}"]`), sub = btn.querySelector('span');
+    const open = unlocked(k);
+    sub.textContent = !open ? `${LEVELS[UNLOCK[k]][1]}で覚える` : k === 'fle' ? (weapon === 'sabre' ? 'サーブルは反則' : '5m まで') : SUB[k];
+    btn.classList.toggle('foul', open && k === 'fle' && weapon === 'sabre');
+    if (!open) btn.disabled = true; else if (st && !st.busy) btn.disabled = false;
+  }
+}
+function gain(n){
+  const before = levelOf(prog.xp);
+  prog.xp += n; saveProg(); renderLevel(n);
+  if (st) st.gained += n;
+  const now = levelOf(prog.xp);
+  if (now > before){
+    const el = document.getElementById('lvl');
+    el.classList.remove('up'); void el.offsetWidth; el.classList.add('up');
+    const moves = Object.keys(UNLOCK).filter(k => UNLOCK[k] > before && UNLOCK[k] <= now);
+    st.levelMsg = `${LEVELS[now][1]}に|昇級|しました。` + moves.map(k => `|新しい技「${ACT[k]}」を|覚えました。`).join('');
+    updateLocks();
+  }
+}
+
 // 背景を組み立てる(照明・光の筋・観客・奥のパネル)
 (() => {
   const el = (tag, attrs, parent) => { const e = document.createElementNS(NS, tag);
@@ -371,15 +440,15 @@ function setWeapon(w){
   document.getElementById('wdesc').innerHTML = t(W().desc);
   document.getElementById('whiteMe').hidden = document.getElementById('whiteCpu').hidden = w !== 'foil';
   document.getElementById('prio').hidden = !W().prio;
-  document.getElementById('fleSub').textContent = w === 'sabre' ? 'サーブルは反則' : '5m まで';
-  document.getElementById('fleBtn').classList.toggle('foul', w === 'sabre');
   newGame();
+  updateLocks(); renderLevel();
 }
 
 function newGame(){
-  st = {me:-START, cpu:START, sMe:0, sCpu:0, turn:1, prio:null, busy:false, over:false, hist:[], cards:{me:0, cpu:0}, cut:{me:true, cpu:true}, recov:{me:false, cpu:false}};
+  st = {me:-START, cpu:START, sMe:0, sCpu:0, turn:1, prio:null, busy:false, over:false, hist:[], cards:{me:0, cpu:0}, cut:{me:true, cpu:true}, recov:{me:false, cpu:false}, gained:0, levelMsg:null};
   draw(); setHint(); renderBook(); lamps(false,false); setBusy(false); call('アン・ガルド'); clearFx(); toast('');
-  ref(`${W().name}|はじめ`, W().intro + '|行動を|1つ|選んでください。|相手も|同時に|動きます。');
+  ref(`${W().name}|はじめ`, W().intro + '|行動を|1つ|選んでください。|相手も|同時に|動きます。' +
+    (unlocked('fle') ? '' : '|フェイントなどの|技は、|レベルが|上がると|覚えます。'));
 }
 
 // 選手の関節の位置(右向き)。腰・膝・足、肩・肘・手、頭、剣先
@@ -571,6 +640,7 @@ function cpuChoose(){
   if (st.recov.me) { w.atk += 70; w.cnt += 10; w.par = Math.max(4, w.par * .5); w.adv *= .3; }   // 戻りのすきを突く
   if (st.recov.cpu) { w.par += 20; w.ret += 20; }
   if (weapon === 'sabre') w.fle = 0;
+  for (const k in UNLOCK) if (!unlocked(k)) w[k] = 0;      // まだ覚えていない技は相手も使わない
   if (st.cpu >= END - 1) { w.ret = 3; w.par += 10; }
   let r = Math.random() * Object.values(w).reduce((a,b)=>a+b), k;
   for (k in w) { r -= w[k]; if (r < 0) break; }
@@ -578,7 +648,7 @@ function cpuChoose(){
 }
 function setHint(){
   st.next = cpuChoose();
-  const keys = Object.keys(ACT).filter(k => !(weapon === 'sabre' && k === 'fle'));
+  const keys = Object.keys(ACT).filter(k => !(weapon === 'sabre' && k === 'fle') && unlocked(k));
   const shown = Math.random() < .7 ? st.next : keys.filter(k=>k!==st.next)[Math.floor(Math.random()*(keys.length-1))];
   document.getElementById('hint').innerHTML = t(TELL[shown]);
   document.getElementById('dist').textContent = `間合い ${st.cpu - st.me}m`;
@@ -599,9 +669,11 @@ function ref(title, body, ruleKey, log, cont, who){
   if (ruleKey){
     const isNew = !learned().has(ruleKey);
     learned().add(ruleKey);
+    if (isNew) gain(20);
     h += `<div class="rule"><em>${isNew?'新しいルール':'ルール'}</em><b>${RULES[ruleKey][0]}</b> ${t(RULES[ruleKey][1])}</div>`;
     renderBook();
   }
+  if (st.levelMsg){ h = `<div class="rule" style="margin:0 0 10px"><em style="color:var(--gold)">昇級</em>${t(st.levelMsg)}</div>` + h; st.levelMsg = null; }
   document.getElementById('ref').innerHTML = h;
   const next = document.getElementById('next');
   const show = b => { document.getElementById('acts1').hidden = document.getElementById('acts2').hidden = !b; next.hidden = b; };
@@ -620,12 +692,12 @@ function renderBook(){
   document.getElementById('bookTitle').textContent = `覚えたルール(${W().name})`;
   document.getElementById('bookCount').textContent = `${keys.filter(k=>learned().has(k)).length} / ${keys.length}`;
 }
-function setBusy(b){ st.busy = b; document.querySelectorAll('.act').forEach(e=>e.disabled=b); }
+function setBusy(b){ st.busy = b; document.querySelectorAll('.act').forEach(e => e.disabled = b || !unlocked(e.dataset.a)); }
 function call(s){ document.getElementById('call').textContent = s; }
 const firstNew = (...keys) => keys.find(k => !learned().has(k)) || null;
 
 function play(a){
-  if (st.busy || st.over) return;
+  if (st.busy || st.over || !unlocked(a)) return;
   const c = st.next, d = st.cpu - st.me, PRIO = W().prio, act = {me:a, cpu:c};
   st.cut = {me: Math.random() < .75, cpu: Math.random() < .75};   // サーブルは斬りが中心
   const log = `あなた:${actName(a,'me')} / 相手:${actName(c,'cpu')}`;
@@ -803,15 +875,18 @@ function play(a){
       return;
     }
     st.sMe += pts.me; st.sCpu += pts.cpu;
+    if (pts.me) gain(10);
+    const ends = (st.sMe >= 5 || st.sCpu >= 5) && st.sMe !== st.sCpu;
+    if (ends){ if (st.sMe > st.sCpu){ prog.wins++; gain(50); } else { prog.losses++; gain(10); } }
     if (pts.me || pts.cpu) lamps(pts.me>0 || document.getElementById('lampMe').classList.contains('lit'), pts.cpu>0 || document.getElementById('lampCpu').classList.contains('lit'));
     call('アルト');
     draw(pose(a,'me'), pose(c,'cpu'));
     if (st.sMe >= 5 && st.sMe === st.sCpu) body = (body ? body + '|' : '') + '同点なので、|このゲームでは|どちらかが|リードするまで|続けます。';
-    if ((st.sMe >= 5 || st.sCpu >= 5) && st.sMe !== st.sCpu){
+    if (ends){
       st.over = true;
       const win = st.sMe > st.sCpu ? 'あなたの|勝ち' : '相手の|勝ち';
       toast(`${win} ${st.sMe}-${st.sCpu}`);
-      ref(`${win} ${st.sMe}-${st.sCpu}`, `${title.replace(/\|/g,'')}。|本番は|15本先取で|行います。`, rule, log, 'もう一度', who);
+      ref(`${win} ${st.sMe}-${st.sCpu}`, `${title.replace(/\|/g,'')}。|本番は|15本先取で|行います。|この試合で|経験値+${st.gained}。`, rule, log, 'もう一度', who);
     } else {
       ref(title, body || ' ', rule, log, '構えに戻る', who);
     }
