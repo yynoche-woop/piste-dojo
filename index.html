@@ -7,7 +7,7 @@
 <title>フェンシング日和</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Shippori+Mincho:wght@400;600;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap">
 <style>
 /* 暗い競技場の舞台。白黒の選手と、剣先の軌跡だけが光る。採点器は実物どおり赤と緑のランプとLED数字。単一の暗い世界観で固定 */
 :root{
@@ -15,7 +15,8 @@
   --ink:#dfe4e9; --muted:#7f8a95; --white:#f2f4f6;
   --trail-me:#9eeeff; --trail-cpu:#ff74d4; --lamp-red:#ff2e2e; --lamp-green:#22e06a; --led:#ff4a35;
   --stagelight:#3d6dff; --line:#b8673d;
-  --body:"Shippori Mincho","Yu Mincho","Hiragino Mincho ProN",serif;
+  /* Windowsはメイリオ、Mac・iPhoneは形の近いヒラギノ角ゴ、AndroidはNoto Sans JP */
+  --body:"Meiryo","メイリオ","Hiragino Sans","Hiragino Kaku Gothic ProN","Noto Sans JP",sans-serif;
   --mono:"Share Tech Mono",ui-monospace,"Consolas",monospace;
   color-scheme:dark;
 }
