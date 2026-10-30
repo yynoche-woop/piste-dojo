@@ -50,7 +50,7 @@ svg{display:block;width:100%;height:auto}
 
 /* 採点器 */
 .box{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:10px;
-  background:#000;border:1px solid var(--hair2);padding:10px 14px;max-width:520px;width:100%;margin:-4px auto 0}
+  background:#000;border:1px solid var(--hair2);padding:10px 14px;max-width:520px;width:100%;box-sizing:border-box;margin:-4px auto 0}
 .side{display:flex;align-items:center;gap:12px}
 .side.r{justify-content:flex-end}
 .lamp{width:34px;height:24px;background:#1a1d21;flex:none;transition:background .12s,box-shadow .12s}
@@ -419,5 +419,6 @@ function resetGuard(){
 document.querySelectorAll('.act').forEach(b => b.onclick = () => play(b.dataset.a));
 newGame();
 </script>
+
 </body>
 </html>
